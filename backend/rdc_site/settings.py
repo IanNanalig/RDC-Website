@@ -52,9 +52,11 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
+default_cors_origins = "http://localhost:5173,http://localhost:3000"
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Your React frontend
-    "http://localhost:3000",
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", default_cors_origins).split(",")
+    if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -115,6 +117,7 @@ if DB_SSLMODE and DATABASES['default']['ENGINE'] == 'django.db.backends.postgres
 # Minimal middleware and templates required for admin and management commands
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
