@@ -632,6 +632,41 @@ def _send_setup_email(user: User, token: PasswordSetupToken, purpose: str = "cre
             "If you did not request this account, please contact the RDC Portal administrator."
         )
 
+    webhook_url = getattr(settings, "EMAIL_WEBHOOK_URL", "")
+    if webhook_url:
+        headers = {"Content-Type": "application/json"}
+        webhook_secret = getattr(settings, "EMAIL_WEBHOOK_SECRET", "")
+        if webhook_secret:
+            headers["X-Email-Webhook-Secret"] = webhook_secret
+        payload = json.dumps(
+            {
+                "to": user.email,
+                "subject": subject,
+                "text": message,
+                "purpose": purpose,
+                "setup_link": link,
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            webhook_url,
+            data=payload,
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=getattr(settings, "EMAIL_TIMEOUT", 10),
+            ) as response:
+                if response.status < 200 or response.status >= 300:
+                    raise RuntimeError(f"Email webhook returned HTTP {response.status}")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Email webhook failed: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Email webhook failed: {exc.reason}") from exc
+        return
+
     resend_api_key = getattr(settings, "RESEND_API_KEY", "")
     if resend_api_key:
         payload = json.dumps(
