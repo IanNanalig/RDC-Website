@@ -645,6 +645,7 @@ def _send_setup_email(user: User, token: PasswordSetupToken, purpose: str = "cre
                 "text": message,
                 "purpose": purpose,
                 "setup_link": link,
+                "secret": webhook_secret,
             }
         ).encode("utf-8")
         request = urllib.request.Request(
