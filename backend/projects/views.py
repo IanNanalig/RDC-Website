@@ -4,6 +4,7 @@ import re
 import difflib
 import urllib.parse
 import urllib.request
+import urllib.error
 import hashlib
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -630,6 +631,40 @@ def _send_setup_email(user: User, token: PasswordSetupToken, purpose: str = "cre
             f"{link}\n\n"
             "If you did not request this account, please contact the RDC Portal administrator."
         )
+
+    resend_api_key = getattr(settings, "RESEND_API_KEY", "")
+    if resend_api_key:
+        payload = json.dumps(
+            {
+                "from": getattr(settings, "RESEND_FROM_EMAIL", settings.DEFAULT_FROM_EMAIL),
+                "to": [user.email],
+                "subject": subject,
+                "text": message,
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=getattr(settings, "EMAIL_TIMEOUT", 10),
+            ) as response:
+                if response.status < 200 or response.status >= 300:
+                    raise RuntimeError(f"Resend returned HTTP {response.status}")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Resend email failed: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Resend email failed: {exc.reason}") from exc
+        return
+
     send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
 
 
