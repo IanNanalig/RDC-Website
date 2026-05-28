@@ -101,8 +101,21 @@ function ProjectBlobs({
   const layerGroupRef = useRef<L.FeatureGroup | null>(null);
 
   useEffect(() => {
+    if (!map) return;
+    if (!layerGroupRef.current) {
+      layerGroupRef.current = L.featureGroup().addTo(map);
+    }
+    return () => {
+      if (layerGroupRef.current) {
+        layerGroupRef.current.clearLayers();
+      }
+    };
+  }, [map]);
+
+  useEffect(() => {
     if (!map || !layerGroupRef.current) return;
-    layerGroupRef.current.clearLayers();
+    const layerGroup = layerGroupRef.current;
+    layerGroup.clearLayers();
 
     groups.forEach((group) => {
       const coords = group.coords;
@@ -186,20 +199,10 @@ function ProjectBlobs({
         haloCircle.setStyle({ fillOpacity: isSelected ? 0.25 : 0.1 });
       });
 
-      layerGroupRef.current?.addLayer(haloCircle);
-      layerGroupRef.current?.addLayer(blobCircle);
+      layerGroup.addLayer(haloCircle);
+      layerGroup.addLayer(blobCircle);
     });
   }, [groups, selectedCity, map, onCitySelect]);
-
-  useEffect(() => {
-    if (!map) return;
-    if (!layerGroupRef.current) {
-      layerGroupRef.current = L.featureGroup().addTo(map);
-    }
-    return () => {
-      if (layerGroupRef.current) layerGroupRef.current.clearLayers();
-    };
-  }, [map]);
 
   return null;
 }
