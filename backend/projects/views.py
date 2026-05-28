@@ -14,6 +14,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -2081,11 +2082,17 @@ class PasswordResetRequestViewSet(viewsets.ModelViewSet):
                 token=get_random_string(48),
                 expires_at=timezone.now() + timedelta(hours=PASSWORD_SETUP_TTL_HOURS),
             )
+            try:
+                _send_setup_email(user, token, purpose="reset")
+            except Exception as exc:
+                transaction.set_rollback(True)
+                return Response({"detail": f"Failed to send email: {exc}"}, status=500)
+
             reset_request.status = "approved"
             reset_request.reviewed_by = request.user
             reset_request.reviewed_at = timezone.now()
             reset_request.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        _send_setup_email(user, token, purpose="reset")
+
         _log_activity(request, "auth_reset_approve", details={"email": reset_request.email})
         return Response({"status": "approved", "setup_link_sent": True})
 
